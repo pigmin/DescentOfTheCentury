@@ -15,8 +15,9 @@ window.onload = () => {
     });
 
     game = new Game(engine, canvas);
-    game.init();
-    game.start();
+    game.init().then( () => {
+        game.start();
+    })
 
 
 }
