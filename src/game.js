@@ -10,8 +10,11 @@ const NB_OBSTACLES = 30;
 const SPAWN_POS_Z = (TRACK_DEPTH * NB_TRACKS);
 const SPEED_Z = 40;
 const SPEED_X = 10;
-
+const SKIING_VOLUME_MIN = 0.5;
+const SKIING_VOLUME_MAX = 2.5;
 const MAIN_SCENE_ROT_X = 0;
+
+const PLAYER_Z_BASE = 14;
 
 import envfileUrl from "../assets/env/environment.env";
 
@@ -22,6 +25,7 @@ import roadTextureUrl from "../assets/textures/14_snow texture-seamless.jpg";
 
 import musicUrl from "../assets/musics/Black Diamond.mp3";
 import hitSoundUrl from "../assets/sounds/344033__reitanna__cute-impact.wav";
+import skiingSoundUrl from "../assets/sounds/skiing.mp3";
 
 import obstacle1Url from "../assets/models/handpainted_pine_tree.glb";
 
@@ -47,6 +51,10 @@ class Game {
     obstacles = [];
     tracks = [];
     snowboard;
+
+    aie;
+    music;
+    skiing;
 
     inputMap = {};
     actions = {};
@@ -118,7 +126,7 @@ class Game {
 
             obstacle.position.z -= (SPEED_Z * delta);
             if (obstacle.position.z < 0) {
-                let x = Scalar.RandomRange(-TRACK_WIDTH / 2, TRACK_WIDTH / 2);
+                let x = Scalar.RandomRange(-TRACK_WIDTH / 1.85, TRACK_WIDTH / 1.85);
                 let z = Scalar.RandomRange(SPAWN_POS_Z * 0.5, SPAWN_POS_Z);
                 obstacle.position.set(x, 0.5, z);
             } else {
@@ -147,35 +155,54 @@ class Game {
 
             }
         }
-
-        this.score += Math.round(delta * 100);
+        if (this.player.position.y <= 0)
+            this.score += Math.round(delta * 100);
     }
 
     updateMoves(delta) {
         if (this.inputMap["KeyA"]) {
             this.player.position.x -= SPEED_X * delta;
-            if (this.player.position.x < -TRACK_WIDTH / 2.5)
-
-                this.player.position.x = -TRACK_WIDTH / 2.5;
+            if (this.player.position.x < -TRACK_WIDTH * 1.5)
+                this.player.position.x = -TRACK_WIDTH * 1.5;
             else {
+                this.player.position.y = 0;
+                this.player.position.z = PLAYER_Z_BASE;
+                
+                let deltaY = (TRACK_WIDTH/2) - Math.abs(this.player.position.x);
+                if (deltaY < 1) {
+                    this.player.position.y = -deltaY/2.5;    
+                    this.player.position.z = PLAYER_Z_BASE - deltaY;
+                }
+
                 this.player.rotation.z = Scalar.MoveTowardsAngle(this.player.rotation.z, Math.PI / 6, 3 * delta);
                 this.player.rotation.y = Scalar.MoveTowardsAngle(this.player.rotation.y, -Math.PI / 8, 2 * delta);
+                this.skiing.setVolume( Scalar.MoveTowards(this.skiing.getVolume(), SKIING_VOLUME_MAX, 3*delta ));
             }
         }
         else if (this.inputMap["KeyD"]) {
 
             this.player.position.x += SPEED_X * delta;
-            if (this.player.position.x > TRACK_WIDTH / 2.5)
-                this.player.position.x = TRACK_WIDTH / 2.5;
+            if (this.player.position.x > TRACK_WIDTH * 1.5)
+                this.player.position.x = TRACK_WIDTH * 1.5;
             else {
+                this.player.position.y = 0;    
+                this.player.position.z = PLAYER_Z_BASE;
+                let deltaY = (TRACK_WIDTH/2) - Math.abs(this.player.position.x);
+                if (deltaY < 1) {
+                    this.player.position.y = -deltaY/2.5;    
+                    this.player.position.z = PLAYER_Z_BASE - deltaY;    
+                }
+
                 this.player.rotation.z = Scalar.MoveTowardsAngle(this.player.rotation.z, -Math.PI / 6, 3 * delta);
                 this.player.rotation.y = Scalar.MoveTowardsAngle(this.player.rotation.y, Math.PI / 8, 2 * delta);
+                this.skiing.setVolume( Scalar.MoveTowards(this.skiing.getVolume(), SKIING_VOLUME_MAX, 3*delta ));
             }
         }
         else {
             if (this.player) {
                 this.player.rotation.z = Scalar.MoveTowardsAngle(this.player.rotation.z, 0, 3 * delta);
                 this.player.rotation.y = Scalar.MoveTowardsAngle(this.player.rotation.y, 0, 3 * delta);
+                this.skiing.setVolume( Scalar.MoveTowards(this.skiing.getVolume(), SKIING_VOLUME_MIN, 3*delta ));
             }
         }
 
@@ -200,11 +227,13 @@ class Game {
 
 
         // This creates and positions a free camera (non-mesh)
-        this.camera = new FreeCamera("camera1", new Vector3(0, 4, 1), this.scene);
+        this.camera = new FreeCamera("camera1", new Vector3(0, 4, 0), this.scene);
         this.camera.maxZ = 15500;
+        this.camera.fov = 0.9;
+
 
         // This targets the camera to scene origin
-        this.camera.setTarget(new Vector3(0, 3, 12));
+        this.camera.setTarget(new Vector3(0, 3, PLAYER_Z_BASE));
 
         // This attaches the camera to the canvas
         this.camera.attachControl(this.canvas, true);
@@ -255,7 +284,7 @@ class Game {
 
         // Our built-in 'ground' shape.
         //var ground = MeshBuilder.CreateGround("ground", {width: 6, height: 6}, scene);
-        let pivot = new TransformNode("tracks", this.scene);
+        let pivot = new TransformNode("world", this.scene);
 
         let res = await SceneLoader.ImportMeshAsync("", "", meshUrl, this.scene);
 
@@ -266,7 +295,7 @@ class Game {
 
         this.player.name = "Player";
         this.player.scaling = new Vector3(1, 1, 1);
-        this.player.position.set(0, 0, 12);
+        this.player.position.set(0, 0, PLAYER_Z_BASE);
         this.player.rotation = new Vector3(0, 0, 0);
         //        res.animationGroups[0].stop();
         //        res.animationGroups[1].play(true);
@@ -345,7 +374,7 @@ class Game {
 
             obstacle.scaling.scaleInPlace(Scalar.RandomRange(5, 10));
 
-            let x = Scalar.RandomRange(-TRACK_WIDTH / 2, TRACK_WIDTH / 2);
+            let x = Scalar.RandomRange(-TRACK_WIDTH / 1.85, TRACK_WIDTH / 1.85);
             let z = Scalar.RandomRange(SPAWN_POS_Z * .5, SPAWN_POS_Z);
             obstacle.position.set(x, 0, z);
 
@@ -427,6 +456,7 @@ class Game {
 
         this.music = new Sound("music", musicUrl, this.scene, undefined, { loop: true, autoplay: true, volume: 0.4 });
         this.aie = new Sound("aie", hitSoundUrl, this.scene);
+        this.skiing = new Sound("skiing", skiingSoundUrl, this.scene, undefined, { loop: true, autoplay: true, volume: SKIING_VOLUME_MIN });
 
     }
 }

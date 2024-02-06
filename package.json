@@ -21,7 +21,7 @@
   "bugs": {
     "url": "https://github.com/pigmin/DescentOfTheCentury/issues"
   },
-  "homepage": "https://github.com/pigmin/DescentOfTheCentury#readme",
+  "homepage": "https://pigmin.github.io/DescentOfTheCentury/",
   "devDependencies": {
     "@babylonjs/core": "^6.41.0",
     "@babylonjs/gui": "^6.41.0",
